@@ -1,81 +1,125 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000'; // Update to your deployed backend URL later
+const API_URL = 'https://pulse-backend-jcea.onrender.com';
 
 export default function App() {
-  const [module, setModule] = useState(null);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  const [insightsData, setInsightsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleGesture = ({ nativeEvent }) => {
-    if (nativeEvent.state === 5) { // Gesture ended
-      const { translationX, translationY } = nativeEvent;
-      if (Math.abs(translationX) > Math.abs(translationY)) {
-        if (translationX > 50) setModule('Connections');
-        else if (translationX < -50) setModule('Wellness');
-      } else {
-        if (translationY > 50) setModule('Tasks');
-        else if (translationY < -50) setModule('Insights');
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/insights`);
+        console.log('API Response:', response.data); // Debug log
+        
+        if (!response.data || !Array.isArray(response.data)) {
+          throw new Error('Invalid data format from API');
+        }
+        
+        setInsightsData(response.data.map(item => ({
+          id: item.id?.toString() || `item-${Date.now()}`,
+          category: item.category,
+          content: item.content
+        })));
+        
+        setError('');
+      } catch (err) {
+        console.error('Fetch error:', err);
+        setError(err.message || 'Failed to load insights');
+      } finally {
+        setLoading(false);
       }
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
-    } else {
-      translateX.value = nativeEvent.translationX;
-      translateY.value = nativeEvent.translationY;
-    }
-  };
+    };
+    
+    fetchData();
+  }, []);
 
-  const orbStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-    ],
-  }));
+  const renderItem = ({ item }) => (
+    <View style={styles.card}>
+      <Text style={styles.title}>{item.category || 'Uncategorized'}</Text>
+      <Text style={styles.content}>{item.content || 'No content available'}</Text>
+    </View>
+  );
 
-  const fetchInsights = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/insights`);
-      console.log(response.data);
-      // Update UI with fetched data in a real app
-    } catch (error) {
-      console.error('Error fetching insights:', error);
-    }
-  };
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#1E90FF" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      {!module ? (
-        <View style={styles.home}>
-          <Animated.View style={[styles.orb, orbStyle]}>
-            <PanGestureHandler onGestureEvent={handleGesture}>
-              <Animated.View style={styles.orbInner} />
-            </PanGestureHandler>
-          </Animated.View>
-          <Text style={styles.hint}>Swipe to Begin</Text>
-        </View>
-      ) : (
-        <View style={styles.module}>
-          <Text style={styles.title}>{module}</Text>
-          <TouchableOpacity onPress={() => { setModule(null); fetchInsights(); }}>
-            <Text style={styles.back}>Back to Pulse</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </GestureHandlerRootView>
+    <View style={styles.container}>
+      <Text style={styles.header}>Daily Insights</Text>
+      <FlatList
+        data={insightsData}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id?.toString() || String(Math.random())}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No insights available</Text>
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  home: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  orb: { width: 150, height: 150, borderRadius: 75, backgroundColor: '#1E90FF', opacity: 0.8 },
-  orbInner: { flex: 1 },
-  hint: { color: '#FFF', marginTop: 20, fontSize: 16 },
-  module: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
-  back: { color: '#1E90FF', marginTop: 20, fontSize: 18 },
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    paddingTop: 40,
+  },
+  header: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  card: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 10,
+    padding: 20,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  title: {
+    color: '#1E90FF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  content: {
+    color: '#FFF',
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  errorText: {
+    color: '#FF4444',
+    fontSize: 18,
+    textAlign: 'center',
+    marginHorizontal: 20,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  emptyText: {
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+  },
 });

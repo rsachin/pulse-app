@@ -29,9 +29,42 @@ function rankContent(profile, content) {
     .slice(0, 3);
 }
 
-app.get('/insights', (req, res) => {
-  const rankedContent = rankContent(userProfile, contentList);
-  res.json(rankedContent);
+// Add insights endpoint
+app.get('/insights', async (req, res) => {
+  try {
+    // Replace with your actual data source (database/API)
+    const realInsights = await fetchRealInsightsData(); // Implement this
+    
+    res.json(realInsights.map((insight, index) => ({
+      id: index + 1,
+      category: insight.category || 'General',
+      content: insight.content || 'Check back later for updates'
+    })));
+    
+  } catch (error) {
+    console.error('Backend error:', error);
+    res.status(500).json({ error: 'Failed to fetch insights' });
+  }
+});
+
+// Example data fetching function (replace with your implementation)
+async function fetchRealInsightsData() {
+  // This should connect to your actual data source
+  return [
+    {
+      category: "Productivity",
+      content: "Prioritize your top 3 tasks for today"
+    },
+    {
+      category: "Wellness",
+      content: "Take a 5-minute stretching break every hour"
+    }
+  ];
+}
+
+// Temporary test endpoint
+app.get('/test', (req, res) => {
+  res.json({ status: 'active', timestamp: new Date() });
 });
 
 app.listen(PORT, () => {
